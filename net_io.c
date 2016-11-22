@@ -448,20 +448,21 @@ static void send_beast_heartbeat(struct net_service *service)
 //
 static void modesSendRawOutput(struct modesMessage *mm) {
     int  msgLen = mm->msgbits / 8;
-    char *p = prepareWrite(&Modes.raw_out, msgLen*2 + 15);
+    size_t sys_timestamp_sec_n = snprintf(NULL, 0, "%ld", mm->sysTimestampMsg.tv_sec);
+    size_t sys_timestamp_nsec_n = snprintf(NULL, 0, "%09ld", mm->sysTimestampMsg.tv_nsec);
+    char *p = prepareWrite(&Modes.raw_out, msgLen*2 + sys_timestamp_sec_n + sys_timestamp_nsec_n + 5);
     int j;
     unsigned char *msg = (Modes.net_verbatim ? mm->verbatim : mm->msg);
 
     if (!p)
         return;
 
-    if (Modes.mlat && mm->timestampMsg) {
-        /* timestamp, big-endian */
-        sprintf(p, "@%012" PRIX64,
-                mm->timestampMsg);
-        p += 13;
-    } else
-        *p++ = '*';
+    sprintf(p, "%ld.",
+            mm->sysTimestampMsg.tv_sec);
+    p += sys_timestamp_sec_n + 1;
+    sprintf(p, "%09ld,",
+            mm->sysTimestampMsg.tv_nsec);
+    p += sys_timestamp_nsec_n + 1;
 
     for (j = 0; j < msgLen; j++) {
         sprintf(p, "%02X", msg[j]);
