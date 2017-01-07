@@ -447,10 +447,57 @@ static void send_beast_heartbeat(struct net_service *service)
 // Write raw output to TCP clients
 //
 static void modesSendRawOutput(struct modesMessage *mm) {
+    size_t n = 0;
     int  msgLen = mm->msgbits / 8;
+    n += msgLen*2;
     size_t sys_timestamp_sec_n = snprintf(NULL, 0, "%ld", mm->sysTimestampMsg.tv_sec);
+    n += sys_timestamp_sec_n;
     size_t sys_timestamp_nsec_n = snprintf(NULL, 0, "%09ld", mm->sysTimestampMsg.tv_nsec);
-    char *p = prepareWrite(&Modes.raw_out, msgLen*2 + sys_timestamp_sec_n + sys_timestamp_nsec_n + 5);
+    n += sys_timestamp_nsec_n;
+    size_t signal_level_n = snprintf(NULL, 0, "%f", mm->signalLevel);
+    n += signal_level_n;
+    size_t addr_n = snprintf(NULL, 0, "%06x", mm->addr);
+    n += addr_n;
+    size_t addr_type_n = 0;
+    switch (mm->addrtype) {
+        case ADDR_ADSB_ICAO:
+        case ADDR_ADSR_ICAO:
+        case ADDR_TISB_ICAO:
+            addr_type_n = 9; // ADSB_ICAO,ADSR_ICAO,TISB_ICAO
+            break;
+        case ADDR_ADSB_OTHER:
+        case ADDR_ADSR_OTHER:
+        case ADDR_TISB_OTHER:
+            addr_type_n = 10; // ADSB_OTHER,ADSR_OTHER,TISB_OTHER
+            break;
+        case ADDR_ADSB_ICAO_NT:
+            addr_type_n = 12; // ADSB_ICAO_NT
+            break;
+        case ADDR_TISB_TRACKFILE:
+            addr_type_n = 14; // TISB_TRACKFILE
+            break;
+        case ADDR_UNKNOWN:
+            addr_type_n = 7;
+            break;
+    }
+    n += addr_type_n;
+    n += 6;
+    size_t lat_n = 0;
+    size_t lon_n = 0;
+    if (mm->cpr_decoded) {
+        lat_n = snprintf(NULL, 0, "%f", mm->decoded_lat);
+        n += lat_n;
+        lon_n = snprintf(NULL, 0, "%f", mm->decoded_lon);
+        n += lon_n;
+    }
+    size_t alt_n = 0;
+    if (mm->altitude_valid) {
+        alt_n = snprintf(NULL, 0, "%d", mm->altitude);
+        n += alt_n;
+        n += 5; // f (ft) || m (meters), baro || GNSS
+    }
+    n += 10; // 9x , + \n
+    char *p = prepareWrite(&Modes.raw_out, n);
     int j;
     unsigned char *msg = (Modes.net_verbatim ? mm->verbatim : mm->msg);
 
@@ -464,12 +511,94 @@ static void modesSendRawOutput(struct modesMessage *mm) {
             mm->sysTimestampMsg.tv_nsec);
     p += sys_timestamp_nsec_n + 1;
 
+    sprintf(p, "%06x", mm->addr);
+    p += 6;
+    *p++ = ',';
+
+    switch(mm->addrtype) {
+        case ADDR_ADSB_ICAO:
+            sprintf(p, "%s", "ADSB_ICAO");
+            p += 9;
+            break;
+        case ADDR_ADSB_ICAO_NT:
+            sprintf(p, "%s", "ADSB_ICAO_NT");
+            p += 12;
+            break;
+        case ADDR_ADSR_ICAO:
+            sprintf(p, "%s", "ADSR_ICAO");
+            p += 9;
+            break;
+        case ADDR_TISB_ICAO:
+            sprintf(p, "%s", "TISB_ICAO");
+            p += 9;
+            break;
+        case ADDR_ADSB_OTHER:
+            sprintf(p, "%s", "ADSB_OTHER");
+            p += 10;
+            break;
+        case ADDR_ADSR_OTHER:
+            sprintf(p, "%s", "ADSR_OTHER");
+            p += 10;
+            break;
+        case ADDR_TISB_TRACKFILE:
+            sprintf(p, "%s", "TISB_TRACKFILE");
+            p += 14;
+            break;
+        case ADDR_TISB_OTHER:
+            sprintf(p, "%s", "TISB_OTHER");
+            p += 10;
+            break;
+        case ADDR_UNKNOWN:
+            sprintf(p, "%s", "UNKNOWN");
+            p += 7;
+            break;
+    }
+    *p++ = ',';
+
     for (j = 0; j < msgLen; j++) {
         sprintf(p, "%02X", msg[j]);
         p += 2;
     }
 
-    *p++ = ';';
+    *p++ = ',';
+
+    sprintf(p, "%f", mm->signalLevel);
+    p += signal_level_n;
+    *p++ = ',';
+    if (mm->cpr_decoded) {
+        sprintf(p, "%f", mm->decoded_lat);
+        p += lat_n;
+        *p++ = ',';
+        sprintf(p, "%f", mm->decoded_lon);
+        p += lon_n;
+        *p++ = ',';
+    } else {
+        *p++ = ',';
+        *p++ = ',';
+    }
+
+    if (mm->altitude_valid) {
+        sprintf(p, "%d", mm->altitude);
+        p += alt_n;
+        *p++ = ',';
+        if (mm->altitude_unit == UNIT_FEET) {
+            *p++ = 'f';
+        } else {
+            *p++ = 'm';
+        }
+        *p++ = ',';
+        if (mm->altitude_source == ALTITUDE_BARO) {
+            sprintf(p, "%s", "BARO");
+            p += 4;
+        } else {
+            sprintf(p, "%s", "GNSS");
+            p += 4;
+        }
+    } else {
+        *p++ = ',';
+        *p++ = ',';
+    }
+
     *p++ = '\n';
 
     completeWrite(&Modes.raw_out, p);
