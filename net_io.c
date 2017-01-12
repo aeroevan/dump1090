@@ -496,7 +496,22 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         n += alt_n;
         n += 5; // f (ft) || m (meters), baro || GNSS
     }
-    n += 10; // 9x , + \n
+    size_t spd_n = 0;
+    if (mm->speed_valid) {
+        spd_n = snprintf(NULL, 0, "%d", mm->speed);
+        n += spd_n;
+        switch (mm->speed_source) {
+            case SPEED_GROUNDSPEED:
+                n += 2;
+                break;
+            case SPEED_IAS:
+            case SPEED_TAS:
+                n += 3;
+                break;
+        }
+    }
+
+    n += 12; // 11x , + \n
     char *p = prepareWrite(&Modes.raw_out, n);
     int j;
     unsigned char *msg = (Modes.net_verbatim ? mm->verbatim : mm->msg);
@@ -596,6 +611,30 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         }
     } else {
         *p++ = ',';
+        *p++ = ',';
+    }
+
+    *p++ = ',';
+
+    if (mm->speed_valid) {
+        sprintf(p, "%d", mm->speed);
+        p += spd_n;
+        *p++ = ',';
+        switch(mm->speed_source) {
+            case SPEED_GROUNDSPEED:
+                sprintf(p, "%s", "GS");
+                p += 2;
+                break;
+            case SPEED_IAS:
+                sprintf(p, "%s", "IAS");
+                p += 3;
+                break;
+            case SPEED_TAS:
+                sprintf(p, "%s", "TAS");
+                p += 3;
+                break;
+        }
+    } else {
         *p++ = ',';
     }
 
