@@ -702,6 +702,8 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         *p++ = ',';
     }
 
+    *p++ = ',';
+
     if (mm->squawk_valid) {
         sprintf(p, "%04x", mm->squawk);
         p += 4;
