@@ -496,6 +496,17 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         n += alt_n;
         n += 5; // f (ft) || m (meters), baro || GNSS
     }
+    size_t gnss_delta_n = 0;
+    if (mm->gnss_delta_valid) {
+        gnss_delta_n = snprintf(NULL, 0, "%d", mm->gnss_delta);
+        n += gnss_delta_n;
+    }
+    size_t heading_n = 0;
+    if (mm->heading_valid) {
+        heading_n = snprintf(NULL, 0, "%d", mm->heading);
+        n += heading_n;
+        n += 3; // tru, mag
+    }
     size_t spd_n = 0;
     if (mm->speed_valid) {
         spd_n = snprintf(NULL, 0, "%d", mm->speed);
@@ -510,8 +521,22 @@ static void modesSendRawOutput(struct modesMessage *mm) {
                 break;
         }
     }
+    size_t vert_rate_n = 0;
+    if (mm->vert_rate_valid) {
+        vert_rate_n = snprintf(NULL, 0, "%d", mm->vert_rate);
+        n += vert_rate_n;
+        n += 4; // baro || GNSS
+    }
+    if (mm->squawk_valid) {
+        n += 4;
+    }
+    size_t callsign_n = 0;
+    if (mm->callsign_valid) {
+        callsign_n = snprintf(NULL, 0, "%s", mm->callsign);
+        n += callsign_n;
+    }
 
-    n += 12; // 11x , + \n
+    n += 16; // 15x , + \n
     char *p = prepareWrite(&Modes.raw_out, n);
     int j;
     unsigned char *msg = (Modes.net_verbatim ? mm->verbatim : mm->msg);
@@ -615,6 +640,25 @@ static void modesSendRawOutput(struct modesMessage *mm) {
     }
 
     *p++ = ',';
+    if (mm->heading_valid) {
+        sprintf(p, "%d", mm->heading);
+        p += heading_n;
+        *p++ = ',';
+        switch(mm->heading_source) {
+            case HEADING_TRUE:
+                sprintf(p, "%s", "TRU");
+                p += 3;
+                break;
+            case HEADING_MAGNETIC:
+                sprintf(p, "%s", "MAG");
+                p += 3;
+                break;
+        }
+    } else {
+        *p++ = ',';
+    }
+
+    *p++ = ',';
 
     if (mm->speed_valid) {
         sprintf(p, "%d", mm->speed);
@@ -636,6 +680,38 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         }
     } else {
         *p++ = ',';
+    }
+
+    *p++ = ',';
+
+    if (mm->vert_rate_valid) {
+        sprintf(p, "%d", mm->vert_rate);
+        p += vert_rate_n;
+        *p++ = ',';
+        switch(mm->vert_rate_source) {
+            case ALTITUDE_BARO:
+                sprintf(p, "%s", "BARO");
+                p += 4;
+                break;
+            case ALTITUDE_GNSS:
+                sprintf(p, "%s", "GNSS");
+                p += 4;
+                break;
+        }
+    } else {
+        *p++ = ',';
+    }
+
+    if (mm->squawk_valid) {
+        sprintf(p, "%04x", mm->squawk);
+        p += 4;
+    }
+
+    *p++ = ',';
+
+    if (mm->callsign_valid) {
+        sprintf(p, "%s", mm->callsign);
+        p += callsign_n;
     }
 
     *p++ = '\n';
