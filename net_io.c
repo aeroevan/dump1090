@@ -536,7 +536,7 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         n += callsign_n;
     }
 
-    n += 16; // 15x , + \n
+    n += 17; // 16x , + \n
     char *p = prepareWrite(&Modes.raw_out, n);
     int j;
     unsigned char *msg = (Modes.net_verbatim ? mm->verbatim : mm->msg);
@@ -611,11 +611,11 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         *p++ = ',';
         sprintf(p, "%f", mm->decoded_lon);
         p += lon_n;
-        *p++ = ',';
     } else {
         *p++ = ',';
-        *p++ = ',';
     }
+
+    *p++ = ',';
 
     if (mm->altitude_valid) {
         sprintf(p, "%d", mm->altitude);
@@ -640,6 +640,7 @@ static void modesSendRawOutput(struct modesMessage *mm) {
     }
 
     *p++ = ',';
+
     if (mm->heading_valid) {
         sprintf(p, "%d", mm->heading);
         p += heading_n;
