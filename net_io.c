@@ -535,8 +535,10 @@ static void modesSendRawOutput(struct modesMessage *mm) {
         callsign_n = snprintf(NULL, 0, "%s", mm->callsign);
         n += callsign_n;
     }
+    size_t airground_n = 1;
+    n += airground_n;
 
-    n += 17; // 16x , + \n
+    n += 18; // 17x , + \n
     char *p = prepareWrite(&Modes.raw_out, n);
     int j;
     unsigned char *msg = (Modes.net_verbatim ? mm->verbatim : mm->msg);
@@ -715,6 +717,23 @@ static void modesSendRawOutput(struct modesMessage *mm) {
     if (mm->callsign_valid) {
         sprintf(p, "%s", mm->callsign);
         p += callsign_n;
+    }
+
+    *p++ = ',';
+
+    switch(mm->airground) {
+        case AG_INVALID:
+            *p++ = 'I';
+            break;
+        case AG_GROUND:
+            *p++ = 'G';
+            break;
+        case AG_AIRBORNE:
+            *p++ = 'A';
+            break;
+        case AG_UNCERTAIN:
+            *p++ = 'U';
+            break;
     }
 
     *p++ = '\n';
