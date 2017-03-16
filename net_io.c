@@ -643,6 +643,12 @@ static void modesSendRawOutput(struct modesMessage *mm) {
 
     *p++ = ',';
 
+    if (mm->gnss_delta_valid) {
+        sprintf(p, "%d", mm->gnss_delta);
+        p += gnss_delta_n;
+    }
+    *p++ = ',';
+
     if (mm->heading_valid) {
         sprintf(p, "%d", mm->heading);
         p += heading_n;
